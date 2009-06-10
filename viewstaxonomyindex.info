@@ -1,0 +1,7 @@
+; $Id$
+name = Views Taxonomy Index
+description = Adds the option to add a taxonomy index to a view
+core = 6.x
+package = Views
+dependencies[] = taxonomy
+dependencies[] = views

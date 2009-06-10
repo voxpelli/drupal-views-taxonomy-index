@@ -1,0 +1,134 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ * Module with a taxonomy views filter
+ */
+
+/**
+ * Implementation of hook_theme().
+ */
+function viewstaxonomyindex_theme($existing, $type, $theme, $path) {
+  return array(
+    'viewstaxonomyindex' => array(
+      'arguments' => array('terms' => NULL),
+    ),
+  );
+}
+
+function theme_viewstaxonomyindex($terms) {
+  return theme('links', $terms);
+}
+
+//TODO: Make this conditional
+function viewstaxonomyindex_preprocess_views_view(&$vars) {
+  static $validator_types;
+
+  $view = $vars['view'];
+
+  if (empty($view->argument)) {
+    return;
+  }
+
+  if (!isset($validator_types)) {
+    $validator_types = array('taxonomy_term');
+
+    $plugins = _views_fetch_plugin_data('argument validator');
+    foreach ($plugins as $key => $value) {
+      if (isset($value['viewstaxonomyindex_indexable']) && $value['viewstaxonomyindex_indexable']) {
+        $validator_types[] = $key;
+      }
+    }
+  }
+
+  $arg_vocab  = NULL;
+  $arg_parent = NULL;
+
+  $local_view = views_get_view($view->name);
+  $local_view->set_display($view->current_display);
+  $local_view->set_arguments($view->args);
+  $local_view->set_items_per_page(0);
+
+  foreach ($view->argument as $key => $arg) {
+    if (is_a($arg, 'views_handler_argument_term_node_tid')) {
+      $vocabs = array();
+      $pos    = $arg->position;
+
+      if (in_array($arg->options['validate_type'], $validator_types) && !empty($arg->options['validate_argument_vocabulary'])) {
+        foreach ($arg->options['validate_argument_vocabulary'] as $key => $value) {
+          if ($value) {
+            $vocabs[] = $key;
+          }
+        }
+      }
+
+      if (empty($vocabs)) {
+        if ($arg_vocab) {
+          $vocabs[] = $arg_vocab;
+        }
+        else {
+          continue;
+        }
+      }
+
+      foreach ($vocabs as $vid) {
+        $tags = empty($arg_parent) ? taxonomy_get_tree($vid) : taxonomy_get_tree($vid, $arg_parent, -1, 1);
+
+        if (empty($tags)) {
+          continue;
+        }
+
+        $tags_local = array();
+
+        if (module_exists('i18ntaxonomy')) {
+          $tags_local = array();
+          foreach ($tags as $key => $tag) {
+            $tags_local[$key] = clone $tag;
+          }
+          $tags_local = i18ntaxonomy_localize_terms($tags_local);
+        }
+
+        $arg_tid = ($arg->options['validate_argument_type'] === 'tid');
+        unset($local_view->args[$pos]);
+        $url = $local_view->get_url();
+        $links = array(
+          'all' => array(
+            'href'  => $url,
+            'title' => $arg->options['wildcard_substitution'],
+            'alias' => TRUE,
+            'attributes' => array('class' => ($url == $_GET['q']) ? 'active' : ''),
+          ),
+        );
+
+        foreach ($tags as $key => $tag) {
+          $local_view->args[$pos] = $arg_tid ? $tag->tid : drupal_strtolower($tag->name);
+          ksort($local_view->args);
+
+          $url = $local_view->get_url();
+          $links[$key] = array(
+            'href'  => $url,
+            'title' => isset($tags_local[$key]) ? $tags_local[$key]->name : $tag->name,
+            'alias' => TRUE,
+            'attributes' => array('class' => ($url == $_GET['q']) ? 'active' : ''),
+          );
+        }
+        $vars['header'] .= theme('viewstaxonomyindex', $links);
+      }
+    }
+    else if (is_a($arg, 'views_handler_argument_vocabulary_vid')) {
+      $tmp = $arg->get_value();
+      if (!empty($tmp)) {
+        $arg_vocab = $tmp;
+      }
+    }
+    else if (is_a($arg, 'views_handler_argument_term_node_tid_depth')) {
+      $tmp = $arg->get_value();
+      if (!empty($tmp)) {
+        $arg_parent = $tmp;
+      }
+    }
+  }
+
+  return;
+}
