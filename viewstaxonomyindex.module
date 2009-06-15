@@ -21,7 +21,26 @@ function theme_viewstaxonomyindex($terms) {
   return theme('links', $terms);
 }
 
-//TODO: Make this conditional
+/**
+ * Implementation of hook_menu().
+ */
+function viewstaxonomyindex_menu() {
+  $items = array();
+
+  $items['admin/build/views/viewstaxonomyindex'] = array(
+    'title'            => 'Taxonomy Index',
+    'description'      => 'Configure on which new the Taxonomy index should show.',
+    'page callback'    => 'drupal_get_form',
+    'page arguments'   => array('viewstaxonomyindex_admin_settings_form'),
+    'access callback'  => 'user_access',
+    'access arguments' => array('administer views'),
+    'type'             => MENU_LOCAL_TASK,
+    'file'             => 'viewstaxonomyindex.admin.inc',
+  );
+
+  return $items;
+}
+
 function viewstaxonomyindex_preprocess_views_view(&$vars) {
   static $validator_types;
 
@@ -31,19 +50,29 @@ function viewstaxonomyindex_preprocess_views_view(&$vars) {
     return;
   }
 
+  $setting = variable_get('viewstaxonomyindex_views_'. $view->name, array());
+  if (!isset($setting[$view->current_display]) || !$setting[$view->current_display]) {
+    return;
+  }
+
   if (!isset($validator_types)) {
     $validator_types = array('taxonomy_term');
+    $validator_names = array();
 
     $plugins = _views_fetch_plugin_data('argument validator');
     foreach ($plugins as $key => $value) {
       if (isset($value['viewstaxonomyindex_indexable']) && $value['viewstaxonomyindex_indexable']) {
         $validator_types[] = $key;
       }
+      if (isset($value['viewstaxonomyindex_term_name']) && $value['viewstaxonomyindex_term_name']) {
+        $validator_names[] = $key;
+      }
     }
   }
 
   $arg_vocab  = NULL;
   $arg_parent = NULL;
+  $arg_tid    = TRUE;
 
   $local_view = views_get_view($view->name);
   $local_view->set_display($view->current_display);
@@ -56,11 +85,16 @@ function viewstaxonomyindex_preprocess_views_view(&$vars) {
       $pos    = $arg->position;
 
       if (in_array($arg->options['validate_type'], $validator_types) && !empty($arg->options['validate_argument_vocabulary'])) {
+        //TODO: Make validate_argument_vocabulary configurable
         foreach ($arg->options['validate_argument_vocabulary'] as $key => $value) {
           if ($value) {
             $vocabs[] = $key;
           }
         }
+      }
+
+      if (($arg->options['validate_type'] === 'taxonomy_term' && $arg->options['validate_argument_type'] !== 'tid') || in_array($arg->options['validate_type'], $validator_names)) {
+        $arg_tid = FALSE;
       }
 
       if (empty($vocabs)) {
@@ -89,7 +123,6 @@ function viewstaxonomyindex_preprocess_views_view(&$vars) {
           $tags_local = i18ntaxonomy_localize_terms($tags_local);
         }
 
-        $arg_tid = ($arg->options['validate_argument_type'] === 'tid');
         unset($local_view->args[$pos]);
         $url = $local_view->get_url();
         $links = array(
