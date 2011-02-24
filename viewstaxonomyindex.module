@@ -96,13 +96,14 @@ function viewstaxonomyindex_preprocess_views_view(&$vars) {
   $above_args = array();
 
   foreach ($view->argument as $key => $arg) {
+    $pos = $arg->position;
+    $wildcard = empty($arg->options['wildcard']) ? '*' : $arg->options['wildcard'];
+    $local_args = $above_args + $original_view->args;
+
     if (is_a($arg, 'views_handler_argument_term_node_tid')) {
       $local_view = $original_view->clone_view();
 
       $vocabs = array();
-      $pos    = $arg->position;
-      $wildcard = empty($arg->options['wildcard']) ? '*' : $arg->options['wildcard'];
-      $local_args = $above_args + $original_view->args;
 
       if (in_array($arg->options['validate_type'], $validator_types) && !empty($arg->options['validate_argument_vocabulary'])) {
         //TODO: Make validate_argument_vocabulary configurable
@@ -178,14 +179,6 @@ function viewstaxonomyindex_preprocess_views_view(&$vars) {
         }
         $vars['header'] .= theme('viewstaxonomyindex', $links);
       }
-
-      if (isset($original_view->args[$pos]) && $original_view->args[$pos] !== $wildcard) {
-        $all_args = FALSE;
-        $above_args[$pos] = $original_view->args[$pos];
-      }
-      else {
-        $above_args[$pos] = $wildcard;
-      }
     }
     else if (is_a($arg, 'views_handler_argument_vocabulary_vid')) {
       $tmp = $arg->get_value();
@@ -198,6 +191,14 @@ function viewstaxonomyindex_preprocess_views_view(&$vars) {
       if (!empty($tmp)) {
         $arg_parent = $tmp;
       }
+    }
+
+    if (isset($local_args[$pos]) && $local_args[$pos] !== $wildcard) {
+      $all_args = FALSE;
+      $above_args[$pos] = $local_args[$pos];
+    }
+    else {
+      $above_args[$pos] = $wildcard;
     }
   }
 
