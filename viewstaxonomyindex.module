@@ -79,12 +79,17 @@ function viewstaxonomyindex_preprocess_views_view(&$vars) {
   $original_view->set_arguments($view->args);
   $original_view->set_items_per_page(0);
 
+  $all_args = TRUE;
+  $above_args = array();
+
   foreach ($view->argument as $key => $arg) {
-    $local_view = $original_view->clone_view();
-    $local_view->set_arguments($original_view->args);
     if (is_a($arg, 'views_handler_argument_term_node_tid')) {
+      $local_view = $original_view->clone_view();
+
       $vocabs = array();
       $pos    = $arg->position;
+      $wildcard = empty($arg->options['wildcard']) ? '*' : $arg->options['wildcard'];
+      $local_args = $above_args + $original_view->args;
 
       if (in_array($arg->options['validate_type'], $validator_types) && !empty($arg->options['validate_argument_vocabulary'])) {
         //TODO: Make validate_argument_vocabulary configurable
@@ -125,7 +130,16 @@ function viewstaxonomyindex_preprocess_views_view(&$vars) {
           $tags_local = i18ntaxonomy_localize_terms($tags_local);
         }
 
-        unset($local_view->args[$pos]);
+        $local_view->set_arguments($local_args);
+        if (count($original_view->args) - 1 > $pos) {
+          $local_view->args[$pos] = $wildcard;
+        }
+        elseif ($all_args) {
+          $local_view->set_arguments(array());
+        }
+        else {
+          unset($local_view->args[$pos]);
+        }
         $url = $local_view->get_url();
         $links = array(
           'all' => array(
@@ -136,6 +150,7 @@ function viewstaxonomyindex_preprocess_views_view(&$vars) {
           ),
         );
 
+        $local_view->set_arguments($local_args);
         foreach ($tags as $key => $tag) {
           $local_view->args[$pos] = $arg_tid ? $tag->tid : drupal_strtolower($tag->name);
           ksort($local_view->args);
@@ -149,6 +164,14 @@ function viewstaxonomyindex_preprocess_views_view(&$vars) {
           );
         }
         $vars['header'] .= theme('viewstaxonomyindex', $links);
+      }
+
+      if (isset($original_view->args[$pos]) && $original_view->args[$pos] !== $wildcard) {
+        $all_args = FALSE;
+        $above_args[$pos] = $original_view->args[$pos];
+      }
+      else {
+        $above_args[$pos] = $wildcard;
       }
     }
     else if (is_a($arg, 'views_handler_argument_vocabulary_vid')) {
