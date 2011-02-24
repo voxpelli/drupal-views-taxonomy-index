@@ -74,12 +74,14 @@ function viewstaxonomyindex_preprocess_views_view(&$vars) {
   $arg_parent = NULL;
   $arg_tid    = TRUE;
 
-  $local_view = views_get_view($view->name);
-  $local_view->set_display($view->current_display);
-  $local_view->set_arguments($view->args);
-  $local_view->set_items_per_page(0);
+  $original_view = views_get_view($view->name);
+  $original_view->set_display($view->current_display);
+  $original_view->set_arguments($view->args);
+  $original_view->set_items_per_page(0);
 
   foreach ($view->argument as $key => $arg) {
+    $local_view = $original_view->clone_view();
+    $local_view->set_arguments($original_view->args);
     if (is_a($arg, 'views_handler_argument_term_node_tid')) {
       $vocabs = array();
       $pos    = $arg->position;
