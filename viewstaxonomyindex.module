@@ -79,6 +79,19 @@ function viewstaxonomyindex_preprocess_views_view(&$vars) {
   $original_view->set_arguments($view->args);
   $original_view->set_items_per_page(0);
 
+  foreach (array_reverse($view->argument) as $key => $arg) {
+    $pos = $arg->position;
+    $wildcard = empty($arg->options['wildcard']) ? '*' : $arg->options['wildcard'];
+    if (isset($original_view->args[$pos])) {
+      if ($original_view->args[$pos] == $wildcard) {
+        unset($original_view->args[$pos]);
+      }
+      else {
+        break;
+      }
+    }
+  }
+
   $all_args = TRUE;
   $above_args = array();
 
